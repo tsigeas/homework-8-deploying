@@ -1,29 +1,55 @@
-const express = require("express");
-const { getKey } = require("./util/key");
+const { getKey, getId } = require("./util/key");
 const { sendKey } = require("./service/email");
 const { index, register, confirm } = require("./views/pages");
 const ClientDao = require("./data/ClientDao");
+const db = require("./data/db");
 
+const express = require("express");
 const app = express();
 const port = process.env.PORT || 5050;
 
 const clients = new ClientDao();
 
-// You need this to parse submitted form data!
+db.connect();
+
 app.use(express.urlencoded({ extended: false }));
 
 app.get("/", (_req, res) => {
   res.send(index());
 });
 
-app.get("/api/clients", async (req, res) => {
-  // TODO users must not get the clients data unless
-  //  they provide a valid API Key
+async function validKey(key){
+  try {
+    const id = getId(key);
+    const client = await clients.read(id);
+    if (!client) {
+      return false;
+    } else {
+      return true;
+    }
+  } catch(err) {
+    return false;
+  }
+ }
+ 
 
-  const data = await clients.readAll();
-  return res.status(200).json({
-    data,
-  });
+app.get("/api/clients", async (req, res) => {
+  // check that a key is provided
+  const {key} = req.query;
+  if(!key) {
+    res.status(400).json({message: "You must provide an API Key!"});
+  } else {
+    // check that the key provided is valid
+    const isValid = await validKey(key);
+    if(isValid) {
+      const data = await clients.readAll();
+      return res.status(200).json({
+        data,
+      });
+    } else {
+      res.status(403).json({message: "Invalid API Key!"});
+    }
+  }
 });
 
 app.get("/register", (_req, res) => {

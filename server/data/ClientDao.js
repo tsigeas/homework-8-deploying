@@ -4,9 +4,6 @@ const Client = require("../model/Client");
 const ApiError = require("../model/ApiError");
 
 class ClientDao {
-  constructor() {
-    this.clients = [];
-  }
 
   async create({ name, email }) {
     if (name === undefined || name === "") {
@@ -17,52 +14,51 @@ class ClientDao {
       throw new ApiError(400, "Every client must have a valid email!");
     }
 
-    const client = new Client(name, email);
-    this.clients.push(client);
+    const client = await Client.create({name, email});
     return client;
   }
 
   // clients may not change their email!
   async update(id, { name }) {
-    const index = this.clients.findIndex((client) => client._id === id);
 
-    if (index === -1) {
+    const client = await Client.findByIdAndUpdate(
+      id,
+      {name},
+      {new: true, runValidators:true}
+    );
+
+    if (client === null) {
       throw new ApiError(404, "There is no client with the given ID!");
     }
 
-    if (name !== undefined) {
-      this.clients[index].name = name;
-    }
-
-    return this.clients[index];
+    return client;
   }
 
   async delete(id) {
-    const index = this.clients.findIndex((client) => client._id === id);
+    const client = await Client.findByIdAndDelete(id);
 
-    if (index === -1) {
+    if (client === null) {
       throw new ApiError(404, "There is no client with the given ID!");
     }
 
-    const client = this.clients[index];
-    this.clients.splice(index, 1);
     return client;
   }
 
   // returns an empty array if there is no client with the given ID
   async read(id) {
-    return this.clients.find((client) => client._id === id);
+    const client = await Client.findById(id);
+    return client ? client : [];
   }
 
   // returns an empty array if there is no client in the database
   //  or no client matches the search queries
   async readAll(query = "") {
     if (query !== "") {
-      return this.clients.filter(
-        (client) => client.name === query || client.email === query
-      );
+      const clients = await Client.find().or([{name: query}, {text: query}]);
+      return clients;
     }
-    return this.clients;
+    const clients = await Client.find({});
+    return clients;
   }
 }
 
